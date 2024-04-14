@@ -110,8 +110,15 @@ namespace CUE4Parse.UE4.Assets
 
             if (useLazySerialization)
             {
+                var rand = new Random();
                 foreach (var export in ExportMap)
                 {
+                    if (b_downsampled(export, rand))
+                    {
+                        export.ExportObject = new Lazy<UObject>();
+                        continue;
+                    }
+
                     export.ExportObject = new Lazy<UObject>(() =>
                     {
                         // Create
@@ -143,6 +150,102 @@ namespace CUE4Parse.UE4.Assets
             }
 
             IsFullyLoaded = true;
+        }
+
+        private bool b_downsampled(FObjectExport export, Random rand)
+        {
+            // Always include these (This check must come first)
+            if (b_neverDownsampled(export))
+                return false;
+
+            // No noticeable change without these
+            if (b_alwaysDownsampled(export))
+                return true;
+
+            // Downsample large landmarks more aggressively. A few should be enough to bound terrain
+            if (b_terrainDownsampled(export, rand))
+                return true;
+
+            // Downsample other meshes less, as these define character of the environment
+            if (b_detailDownsampled(export, rand))
+                return true;
+
+            return false;
+        }
+
+        private bool b_neverDownsampled(FObjectExport export)
+        {
+            if (export.ObjectName.ToString().Contains("Medical")
+                  && export.ObjectName.ToString().Contains("Lamp")
+                  && export.ObjectName.ToString().Contains("Stool")
+                  && export.ObjectName.ToString().Contains("Book")
+                  && export.ObjectName.ToString().Contains("Dead")
+                  && export.ObjectName.ToString().Contains("Corpse")
+                  && export.ObjectName.ToString().Contains("Cage")
+                  && export.ObjectName.ToString().Contains("Remedy")
+                  && export.ObjectName.ToString().Contains("Rack")
+                  && export.ObjectName.ToString().Contains("Mortuary")
+                  && export.ObjectName.ToString().Contains("Autopsy")
+                  && export.ObjectName.ToString().Contains("Dissection")
+                  && export.ObjectName.ToString().Contains("Troley")
+                  && export.ObjectName.ToString().Contains("Device")
+                  && export.ObjectName.ToString().Contains("Gate")
+                  && export.ObjectName.ToString().Contains("Underdark"))
+            { return true; }
+
+            return false;
+        }
+
+        private bool b_alwaysDownsampled(FObjectExport export)
+        {
+            if (export.ClassName.Contains("Blueprint")
+                  || export.ClassName.Contains("Niagara")
+                  || export.ClassName.Contains("Fog")
+                  || export.ObjectName.ToString().Contains("Fog")
+                  || export.ClassName.Contains("Decal")
+                  || export.ObjectName.ToString().Contains("Decal")
+                  || export.ObjectName.ToString().Contains("Light")
+                  || export.ClassName.Contains("NavCollision")
+                  || export.ObjectName.ToString().Contains("NavCollision")
+                  || export.ClassName.Contains("SCS")
+                  || export.ObjectName.ToString().Contains("SCS")
+                  || export.ClassName.Contains("SkeletalMeshComponent")
+                  || export.ObjectName.ToString().Contains("SkeletalMeshComponent")
+                  || export.ObjectName.ToString().Contains("SM_Exhibition_Floor_01"))
+            { return true; }
+
+            return false;
+        }
+
+        private bool b_terrainDownsampled(FObjectExport export, Random rand)
+        {
+            const int LargeLandmarkDownscaleRate = 40;
+
+            if ((export.ObjectName.ToString().Contains("Wall")
+                   || export.ObjectName.ToString().Contains("Pillar")
+                   || export.ObjectName.ToString().Contains("Pipe")
+                   || export.ObjectName.ToString().Contains("Wire")
+                   || export.ObjectName.ToString().Contains("Width")
+                   || export.ObjectName.ToString().Contains("BaseBottom")
+                   || export.ObjectName.ToString().Contains("Floor")
+                ) && rand.Next(100) < LargeLandmarkDownscaleRate)
+            { return true; }
+
+            return false;
+        }
+
+        private bool b_detailDownsampled(FObjectExport export, Random rand)
+        {
+            const int DetailDownscaleRate = 0;
+
+            if ((export.ClassName.Contains("StaticMeshActor")
+                   || export.ObjectName.ToString().Contains("StaticMeshActor")
+                   || export.ClassName.Contains("StaticMeshComponent")
+                   || export.ObjectName.ToString().Contains("StaticMeshComponent")
+                ) && rand.Next(100) < DetailDownscaleRate)
+            { return true; }
+
+            return false;
         }
 
         public Package(FArchive uasset, FArchive? uexp, FArchive? ubulk = null, FArchive? uptnl = null,
