@@ -113,7 +113,10 @@ namespace CUE4Parse.UE4.Assets
                 var rand = new Random();
                 foreach (var export in ExportMap)
                 {
-                    if (b_downsampled(export, rand))
+                    string heuristic = "preserve_detail";
+                    bool b_excludeRoof = true;
+                    bool b_targetHighFrequencyMeshes = true;
+                    if (b_downsampled(export, rand, heuristic, b_excludeRoof, b_targetHighFrequencyMeshes))
                     {
                         export.ExportObject = new Lazy<UObject>();
                         continue;
@@ -152,51 +155,75 @@ namespace CUE4Parse.UE4.Assets
             IsFullyLoaded = true;
         }
 
-        private bool b_downsampled(FObjectExport export, Random rand)
+        private bool b_downsampled(FObjectExport export, Random rand, string heuristic,
+            bool b_excludeRoof, bool b_targetHighFrequencyMeshes)
         {
-            // Always include these (This check must come first)
-            if (b_neverDownsampled(export))
+            switch (heuristic)
+            {
+                case "preserve_detail":
+                    return b_downsampled_preserveDetail(export, rand, b_excludeRoof, b_targetHighFrequencyMeshes);
+                case "preserve_structure":
+                default:
+                    return b_downsampled_preserveStructure(export, rand, b_excludeRoof, b_targetHighFrequencyMeshes);
+            }
+        }
+
+        private bool b_downsampled_preserveDetail(FObjectExport export, Random rand,
+            bool b_excludeRoof, bool b_targetHighFrequencyMeshes)
+        {
+            const int TerrainDownsampleRate = 0;
+            const int GeneralDownsampleRate = 0;
+
+            if (b_nonMesh(export))
+                return true;
+
+            if (b_excludeRoof && b_roofMesh(export))
+                return true;
+
+            if (b_specialProps(export))
                 return false;
 
-            // No noticeable change without these
-            if (b_alwaysDownsampled(export))
+            // TODO: Document true downsampling rate for high-frequency terrain, high-frequency, non-terrain
+            if (b_targetHighFrequencyMeshes && b_highFrequencyMesh(export, rand))
                 return true;
 
-            // Downsample large landmarks more aggressively. A few should be enough to bound terrain
-            if (b_terrainDownsampled(export, rand))
+            // TODO: Document true downsampling rate for terrain
+            if (b_terrainDownsampled(export, rand, TerrainDownsampleRate))
                 return true;
 
-            // Downsample other meshes less, as these define character of the environment
-            if (b_detailDownsampled(export, rand))
+            if (b_generalDownsampled(export, rand, GeneralDownsampleRate))
                 return true;
 
             return false;
         }
 
-        private bool b_neverDownsampled(FObjectExport export)
+        private bool b_downsampled_preserveStructure(FObjectExport export, Random rand,
+            bool b_excludeRoof, bool b_targetHighFrequencyMeshes)
         {
-            if (export.ObjectName.ToString().Contains("Medical")
-                  && export.ObjectName.ToString().Contains("Lamp")
-                  && export.ObjectName.ToString().Contains("Stool")
-                  && export.ObjectName.ToString().Contains("Book")
-                  && export.ObjectName.ToString().Contains("Dead")
-                  && export.ObjectName.ToString().Contains("Corpse")
-                  && export.ObjectName.ToString().Contains("Cage")
-                  && export.ObjectName.ToString().Contains("Remedy")
-                  && export.ObjectName.ToString().Contains("Rack")
-                  && export.ObjectName.ToString().Contains("Mortuary")
-                  && export.ObjectName.ToString().Contains("Autopsy")
-                  && export.ObjectName.ToString().Contains("Dissection")
-                  && export.ObjectName.ToString().Contains("Troley")
-                  && export.ObjectName.ToString().Contains("Device")
-                  && export.ObjectName.ToString().Contains("Gate")
-                  && export.ObjectName.ToString().Contains("Underdark"))
-            { return true; }
+            const int TerrainDownsampleRate = 0;
+            const int GeneralDownsampleRate = 40;
+
+            if (b_nonMesh(export))
+                return true;
+
+            if (b_excludeRoof && b_roofMesh(export))
+                return true;
+
+            // Filter out special props already preserved in lossy-structure heuristic
+            if (b_specialProps(export))
+                return true;
+
+            // If a terrain mesh passes the structure downsampling, don't require it to also pass general downsampling
+            if (!b_terrainDownsampled(export, rand, TerrainDownsampleRate))
+                return false;
+
+            if (b_generalDownsampled(export, rand, GeneralDownsampleRate))
+                return true;
 
             return false;
         }
 
-        private bool b_alwaysDownsampled(FObjectExport export)
+        private bool b_nonMesh(FObjectExport export)
         {
             if (export.ClassName.Contains("Blueprint")
                   || export.ClassName.Contains("Niagara")
@@ -210,39 +237,80 @@ namespace CUE4Parse.UE4.Assets
                   || export.ClassName.Contains("SCS")
                   || export.ObjectName.ToString().Contains("SCS")
                   || export.ClassName.Contains("SkeletalMeshComponent")
-                  || export.ObjectName.ToString().Contains("SkeletalMeshComponent")
-                  || export.ObjectName.ToString().Contains("SM_Exhibition_Floor_01"))
+                  || export.ObjectName.ToString().Contains("SkeletalMeshComponent"))
             { return true; }
 
             return false;
         }
 
-        private bool b_terrainDownsampled(FObjectExport export, Random rand)
+        private bool b_roofMesh(FObjectExport export)
         {
-            const int LargeLandmarkDownscaleRate = 40;
+            if (export.ObjectName.ToString().Contains("SM_Exhibition_Floor_01")
+                  || export.ObjectName.ToString().Contains("Roof"))
+            { return true; }
 
+            return false;
+        }
+
+        private bool b_specialProps(FObjectExport export)
+        {
+            if (export.ObjectName.ToString().Contains("Medical")
+                  && export.ObjectName.ToString().Contains("Lamp")
+                  && export.ObjectName.ToString().Contains("lantern")
+                  && export.ObjectName.ToString().Contains("Stool")
+                  && export.ObjectName.ToString().Contains("Book")
+                  && export.ObjectName.ToString().Contains("Paper")
+                  && export.ObjectName.ToString().Contains("paper")
+                  && export.ObjectName.ToString().Contains("Dead")
+                  && export.ObjectName.ToString().Contains("Corpse")
+                  && export.ObjectName.ToString().Contains("Cage")
+                  && export.ObjectName.ToString().Contains("Remedy")
+                  && export.ObjectName.ToString().Contains("Rack")
+                  && export.ObjectName.ToString().Contains("Mortuary")
+                  && export.ObjectName.ToString().Contains("Autopsy")
+                  && export.ObjectName.ToString().Contains("Dissection")
+                  && export.ObjectName.ToString().Contains("Troley")
+                  && export.ObjectName.ToString().Contains("Device")
+                  && export.ObjectName.ToString().Contains("Gate")
+                  && export.ObjectName.ToString().Contains("Door")
+                  && export.ObjectName.ToString().Contains("Underdark"))
+            { return true; }
+
+            return false;
+        }
+
+        private bool b_highFrequencyMesh(FObjectExport export, Random rand)
+        {
+            const int HighFrequencyDownscaleRate = 90;
+
+            if ((export.ObjectName.ToString().Contains("Width")
+                  || export.ObjectName.ToString().Contains("BaseBottom")
+                ) && rand.Next(100) < HighFrequencyDownscaleRate)
+            { return true; }
+
+            return false;
+        }
+
+        private bool b_terrainDownsampled(FObjectExport export, Random rand, int downscaleRate)
+        {
             if ((export.ObjectName.ToString().Contains("Wall")
                    || export.ObjectName.ToString().Contains("Pillar")
+                   || export.ObjectName.ToString().Contains("Floor")
                    || export.ObjectName.ToString().Contains("Pipe")
                    || export.ObjectName.ToString().Contains("Wire")
-                   || export.ObjectName.ToString().Contains("Width")
-                   || export.ObjectName.ToString().Contains("BaseBottom")
-                   || export.ObjectName.ToString().Contains("Floor")
-                ) && rand.Next(100) < LargeLandmarkDownscaleRate)
+                ) && rand.Next(100) < downscaleRate)
             { return true; }
 
             return false;
         }
-
-        private bool b_detailDownsampled(FObjectExport export, Random rand)
+        
+        private bool b_generalDownsampled(FObjectExport export, Random rand, int downscaleRate)
         {
-            const int DetailDownscaleRate = 0;
-
             if ((export.ClassName.Contains("StaticMeshActor")
                    || export.ObjectName.ToString().Contains("StaticMeshActor")
                    || export.ClassName.Contains("StaticMeshComponent")
                    || export.ObjectName.ToString().Contains("StaticMeshComponent")
-                ) && rand.Next(100) < DetailDownscaleRate)
+                ) && rand.Next(100) < downscaleRate)
             { return true; }
 
             return false;
