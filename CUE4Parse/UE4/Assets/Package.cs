@@ -183,11 +183,33 @@ namespace CUE4Parse.UE4.Assets
             if (b_specialProps(export))
                 return false;
 
-            // TODO: Document true downsampling rate for high-frequency terrain, high-frequency, non-terrain
+            /* True downsampling rate for high-frequency terrain:
+             * high_freq_terrain_downsample_rate = 100 - high_freq_terrain_pass_rate
+             *                                   = 100 - TerrainDownsampleRate - HighFrequencyDownsampleRate + TerrainDownsampleRate*HighFrequencyDownsampleRate
+             *                                       + GeneralDownsampleRate*TerrainDownsampleRate + GeneralDownsampleRate*HighFrequencyRate
+             *                                       - GeneralDownsampleRate*TerrainDownsampleRate*HighFrequencyDownsampleRate
+             * high_freq_terrain_pass_rate = pass_high_freq_rate * pass_terrain_rate/100 * pass_general_rate/100
+             * pass_high_freq_rate = 100 - TerrainDownsampleRate
+             * pass_terrain_rate = 100 - HighFrequencyDownsampleRate
+             * pass_general_rate = 100 - GeneralDownsampleRate
+             */
+            /* True downsampling rate for high-frequency non-terrain:
+             * high_freq_non_terrain_downsample_rate = 100 - pass_high_freq_and_terrain_and_general_rate
+             *                                       = HighFrequencyDownsampleRate + GeneralDownsampleRate - HighFrequencyDownsampleRate*GeneralDownsampleRate/100
+             * pass_high_freq_and_terrain_and_general_rate = pass_high_freq_rate * pass_general_rate/100
+             * pass_high_freq_rate = 100 - TerrainDownsampleRate
+             * pass_general_rate = 100 - GeneralDownsampleRate
+             */
             if (b_targetHighFrequencyMeshes && b_highFrequencyMesh(export, rand))
                 return true;
 
-            // TODO: Document true downsampling rate for terrain
+            /* True downsampling rate for terrain:
+             * terrain_downsample_rate = 100 - pass_terrain_and_general_rate
+             *                         = TerrainDownsampleRate + GeneralDownsampleRate - TerrainDownsampleRate*GeneralDownsampleRate/100
+             * pass_terrain_and_general_rate = pass_terrain_rate * pass_general_rate/100
+             * pass_terrain_rate = 100 - TerrainDownsampleRate
+             * pass_general_rate = 100 - GeneralDownsampleRate
+             */
             if (b_terrainDownsampled(export, rand, TerrainDownsampleRate))
                 return true;
 
