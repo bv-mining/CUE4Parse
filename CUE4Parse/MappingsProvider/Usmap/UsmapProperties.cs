@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using Serilog;
 
 namespace CUE4Parse.MappingsProvider.Usmap
 {
@@ -29,7 +30,7 @@ namespace CUE4Parse.MappingsProvider.Usmap
 
         public static PropertyInfo ParsePropertyInfo(FUsmapReader Ar, IReadOnlyList<string> nameLut)
         {
-            var index = Ar.Read<ushort>();
+            var index = Ar.Read<ushort>(); // This always seems to be 0 for LOP usmap?
             var arrayDim = Ar.Read<byte>();
             var name = Ar.ReadName(nameLut)!;
             var type = ParsePropertyType(Ar, nameLut);

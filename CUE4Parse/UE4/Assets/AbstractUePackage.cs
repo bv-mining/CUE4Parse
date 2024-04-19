@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -70,11 +70,12 @@ namespace CUE4Parse.UE4.Assets
                 switch (remaining)
                 {
                     case > 0:
-                        Log.Warning("Did not read {0} correctly, {1} bytes remaining ({2}%)", obj.ExportType, remaining,
-                            Math.Round((decimal)remaining / validPos * 100, 2));
+                        Log.Warning("Did not read {3} of type {0} correctly, {1} bytes remaining ({2}%)", obj.ExportType, remaining,
+                            Math.Round((decimal)remaining / validPos * 100, 2), obj.GetFullName());
                         break;
                     case < 0:
-                        Log.Warning("Did not read {0} correctly, {1} bytes exceeded", obj.ExportType, Math.Abs(remaining));
+                        Log.Warning("Did not read {2} of type {0} correctly, {1} bytes exceeded", obj.ExportType, Math.Abs(remaining),
+                            obj.GetFullName());
                         break;
                     default:
                         Log.Debug("Successfully read {0} at {1} with size {2}", obj.ExportType, serialOffset, serialSize);
@@ -89,7 +90,7 @@ namespace CUE4Parse.UE4.Assets
                     throw new ParserException($"Could not read {obj.ExportType} correctly", e);
                 }
 
-                Log.Error(e, "Could not read {0} correctly", obj.ExportType);
+                Log.Error(e, "Could not read {1} of type {0} correctly", obj.ExportType, obj.GetFullName());
             }
         }
 

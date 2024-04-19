@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using CUE4Parse.UE4.Readers;
+using Serilog;
 
 namespace CUE4Parse.MappingsProvider.Usmap
 {
@@ -18,7 +19,8 @@ namespace CUE4Parse.MappingsProvider.Usmap
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ReadNameEntry(this FArchive Ar)
         {
-            return Ar.Read<int>();
+            var result = Ar.Read<int>();
+            return result;
         }
 
         public static unsafe string ReadStringUnsafe(this FArchive Ar, int nameLength)

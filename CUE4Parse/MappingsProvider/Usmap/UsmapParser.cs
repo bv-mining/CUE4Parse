@@ -6,6 +6,7 @@ using CUE4Parse.UE4.Exceptions;
 using CUE4Parse.UE4.Objects.Core.Serialization;
 using CUE4Parse.UE4.Readers;
 using CUE4Parse.UE4.Versions;
+using Serilog;
 using ZstdSharp;
 
 namespace CUE4Parse.MappingsProvider.Usmap;
