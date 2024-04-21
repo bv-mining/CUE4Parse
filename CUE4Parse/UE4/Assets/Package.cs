@@ -113,7 +113,7 @@ namespace CUE4Parse.UE4.Assets
                 var rand = new Random();
                 foreach (var export in ExportMap)
                 {
-                    if (b_downsampled(export, rand, true))
+                    if (b_exportDownsampled(export, rand))
                     {
                         export.ExportObject = new Lazy<UObject>();
                         continue;
@@ -152,21 +152,22 @@ namespace CUE4Parse.UE4.Assets
             IsFullyLoaded = true;
         }
 
-        private bool b_downsampled(FObjectExport export, Random rand, bool b_excludeRoof)
+        private bool b_exportDownsampled(FObjectExport export, Random rand)
         {
             // 04: 0/0/90
-            // 03: 0/0/95; 100/0/0; 0/50/0
+            // 03: 0/0/95; 100/0/0; 0/40/0
             // 02: 90/15/90
             const int TerrainDownsampleRate = 0;
             const int GeneralDownsampleRate = 0;
+            const int HighFrequencyDownscaleRate = 95;
 
-            if (b_nonMesh(export, rand))
+            if (b_nonMesh(export))
                 return true;
 
-            if (b_excludeRoof && b_roofMesh(export, rand))
+            if (b_roofMesh(export))
                 return true;
 
-            if (b_specialProps(export, rand))
+            if (b_specialProps(export))
                 return false;
 
             /* True downsampling rate for high-frequency terrain:
@@ -179,7 +180,7 @@ namespace CUE4Parse.UE4.Assets
              *                                         - HighFrequencyDownsampleRate*GeneralDownsampleRate/100
              * pass_high_freq_and_terrain_and_general_rate = pass_high_freq_rate * pass_general_rate/100
              */
-            if (b_highFrequencyMeshDownsampled(export, rand))
+            if (b_highFrequencyMesh(export) && b_downsampled(rand, HighFrequencyDownscaleRate))
                 return true;
 
             /* True downsampling rate for terrain:
@@ -187,25 +188,63 @@ namespace CUE4Parse.UE4.Assets
              *                         = TerrainDownsampleRate + GeneralDownsampleRate - TerrainDownsampleRate*GeneralDownsampleRate/100
              * pass_terrain_and_general_rate = pass_terrain_rate * pass_general_rate/100
              */
-            if (b_terrainMeshDownsampled(export, rand, TerrainDownsampleRate))
+            if (b_terrainMesh(export) && !b_highFrequencyMesh(export)
+                && b_downsampled(rand, TerrainDownsampleRate))
                 return true;
 
-            if (b_generalMeshDownsampled(export, rand, GeneralDownsampleRate))
+            if (/*b_generalMesh(export) &&*/ !b_highFrequencyMesh(export) && !b_terrainMesh(export)
+                && b_downsampled(rand, GeneralDownsampleRate))
                 return true;
 
             return false;
         }
 
-        private bool b_nonMesh(FObjectExport export, Random rand)
+        private bool b_downsampled(Random rand, int downsampleRate)
         {
-            string[] nonMeshes = ["Blueprint", "Decal", "Foliage", "Fog", "Light", "NavCollision", "Niagara", "SCS", "SkeletalMeshComponent"];
+            return rand.Next(100) < downsampleRate;
+        }
+
+        private bool b_nonMesh(FObjectExport export)
+        {
+            string[] nonMeshes = ["Blueprint", "Decal", "Foliage", "Fog", "Light",
+                "NavCollision", "Niagara", "SCS", "SkeletalMeshComponent"]; // 04
             return b_matchesTargetedMesh(nonMeshes, export);
         }
 
-        private bool b_roofMesh(FObjectExport export, Random rand)
+        private bool b_roofMesh(FObjectExport export)
         {
-            string[] roofMeshes = ["SM_Exhibition_Floor_01", "Roof"];
+            string[] roofMeshes = ["SM_Exhibition_Floor_01", "Roof"]; // 04
             return b_matchesTargetedMesh(roofMeshes, export);
+        }
+
+        private bool b_specialProps(FObjectExport export)
+        {
+            string[] _specialProps = ["Medical", "Lamp", "lantern", "Stool", "Book", "Dead", "Corpse", // 04
+                // "Paper", "paper", "Cage", // !03
+                "Remedy", "Rack", "Mortuary", "Autopsy", "Dissection", "Troley", "Device", "Gate", "Door", "Underdark",
+                "Screen", "mattress", "Pillow", "bunk", "Washstand", "Rag"]; // 03
+            return b_matchesTargetedMesh(_specialProps, export);
+        }
+
+        private bool b_highFrequencyMesh(FObjectExport export)
+        {
+            string[] _auxiliaryMeshes = ["Width", "BaseBottom", // 04
+                "GroundRock", "Exterior_Block", "Cathedral_Column", "TrashPaper", // 03
+                "Molding", "Factory_Ladder_01", "Factory_Pillar", "Factory_Pipe",
+                "Interior_Pipe", "IronProp", "BossWall_01", "Factory_HeightFrame", "Rubble"];
+            return b_matchesTargetedMesh(_auxiliaryMeshes, export);
+        }
+
+        private bool b_terrainMesh(FObjectExport export)
+        {
+            string[] _terrainMeshes = ["Wall", "Pillar", "Floor", "Pipe", "Wire"];
+            return b_matchesTargetedMesh(_terrainMeshes, export);
+        }
+
+        private bool b_generalMesh(FObjectExport export)
+        {
+            string[] _generalMeshes = ["StaticMeshActor", "StaticMeshComponent"];
+            return b_matchesTargetedMesh(_generalMeshes, export);
         }
 
         private bool b_matchesTargetedMesh(string[] targetedMeshes, FObjectExport export)
@@ -213,50 +252,6 @@ namespace CUE4Parse.UE4.Assets
             foreach (string targetedMesh in targetedMeshes)
             {
                 if (export.ClassName.Contains(targetedMesh) || export.ObjectName.ToString().Contains(targetedMesh))
-                { return true; }
-            }
-
-            return false;
-        }
-
-        private bool b_specialProps(FObjectExport export, Random rand)
-        {
-            string[] specialProps = ["Medical", "Lamp", "lantern", "Stool", "Book", "Dead", "Corpse", // 04
-                // "Paper", "paper", "Cage", // !03
-                "Remedy", "Rack", "Mortuary", "Autopsy", "Dissection", "Troley", "Device", "Gate", "Door", "Underdark",
-                "Screen", "mattress", "Pillow", "bunk", "Washstand", "Stair"]; // 03
-            return b_matchesTargetedMesh(specialProps, export);
-        }
-
-        private bool b_highFrequencyMeshDownsampled(FObjectExport export, Random rand)
-        {
-            const int HighFrequencyDownscaleRate = 95;
-            string[] auxiliaryMeshes = ["Width", "BaseBottom", // 04
-                "GroundRock", "Exterior_Block", "Cathedral_Column", "TrashPaper", // 03
-                "Molding", "Factory_Ladder_01", "Factory_Pillar", "Factory_Pipe",
-                "Interior_Pipe", "IronProp", "BossWall_01", "Factory_HeightFrame", "Rubble"];
-
-            return b_targetedMeshDownsampled(auxiliaryMeshes, export, rand, HighFrequencyDownscaleRate);
-        }
-
-        private bool b_terrainMeshDownsampled(FObjectExport export, Random rand, int downscaleRate)
-        {
-            string[] terrainMeshes = ["Wall", "Pillar", "Floor", "Pipe", "Wire"];
-            return b_targetedMeshDownsampled(terrainMeshes, export, rand, downscaleRate);
-        }
-        
-        private bool b_generalMeshDownsampled(FObjectExport export, Random rand, int downscaleRate)
-        {
-            string[] generalMeshes = ["StaticMeshActor", "StaticMeshComponent"];
-            return b_targetedMeshDownsampled(generalMeshes, export, rand, downscaleRate);
-        }
-
-        private bool b_targetedMeshDownsampled(string[] targetedMeshes, FObjectExport export, Random rand, int downscaleRate)
-        {
-            foreach (string targetedMesh in targetedMeshes)
-            {
-                if ((export.ClassName.Contains(targetedMesh) || export.ObjectName.ToString().Contains(targetedMesh))
-                    && rand.Next(100) < downscaleRate)
                 { return true; }
             }
 
